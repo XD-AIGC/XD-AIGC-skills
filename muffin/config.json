@@ -1,0 +1,23 @@
+{
+  "name": "麦芬",
+  "name_en": "Muffin",
+  "description": "A cute chibi fox character with orange-yellow fur, large pointed red ears that resemble a hood or hat, a red cape/cloak, a key pendant necklace with a circular emblem, white cheeks with long pointed whiskers, a small pink nose, and big expressive eyes (brown/amber). The character has chibi proportions with an oversized head relative to body.",
+  "key_features": "IMPORTANT details that must be correct: (1) The tail is THIN and SLENDER (not bushy/fluffy), ending with a small cyan/teal diamond-shaped gem tip. (2) Large red pointed ears. (3) Red cape with key pendant. (4) Small backpack/scroll on back.",
+  "style_notes": "Warm color palette dominated by orange, red, and yellow. Soft cel-shading in 2D versions with clean outlines. Smooth 3D rendering similar to animated movie style in 3D versions. Always maintains chibi proportions.",
+  "prompt_template": "Generate an image of Muffin (麦芬), a cute chibi fox character. Muffin has orange-yellow fur, large pointed red ears resembling a hood, wears a red cape/cloak with a key pendant necklace, has white cheeks with long pointed whiskers, a small pink nose, and big expressive amber eyes. Art style: {style}. Scene: {scene}",
+  "default_style": "2D cartoon illustration, soft cel-shading, warm colors, clean outlines",
+  "reference_images": [
+    "麦芬04.png",
+    "麦芬05.png",
+    "麦芬08.png"
+  ],
+  "reference_roles": {
+    "art_style": ["麦芬02.png", "麦芬08.png"],
+    "proportions": ["麦芬05.png", "麦芬08.png", "麦芬12.jpg"],
+    "back_view": ["麦芬10.png"]
+  },
+  "style_reference_images": {
+    "2d": ["麦芬04.png", "麦芬05.png", "麦芬08.png"],
+    "3d": ["麦芬09.png", "麦芬13.png"]
+  }
+}
