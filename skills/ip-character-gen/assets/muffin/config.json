@@ -1,0 +1,19 @@
+{
+  "name": "麦芬",
+  "name_en": "Muffin",
+  "style_options": {
+    "2D": {
+      "label": "2D卡通插画",
+      "style_key": "2D",
+      "style_prompt": "图1角色，尾巴形状严格参照图1，"
+    }
+  },
+  "style_reference_images": {
+    "2D": ["麦芬15.png", "麦芬02.png", "麦芬08.png"]
+  },
+  "reference_images": ["麦芬15.png", "麦芬02.png", "麦芬08.png"],
+  "reference_roles": {
+    "expression": ["麦芬02.png"],
+    "proportions": ["麦芬08.png"]
+  }
+}

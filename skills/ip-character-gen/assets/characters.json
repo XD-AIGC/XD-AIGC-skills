@@ -1,0 +1,12 @@
+{
+  "characters": {
+    "麦芬": {
+      "dir": "muffin",
+      "aliases": ["muffin", "gogo muffin", "GOGO麦芬", "麦芬猫"]
+    },
+    "嗒啦啦": {
+      "dir": "talala",
+      "aliases": ["talala", "嗒拉拉", "塔啦啦", "dalalala"]
+    }
+  }
+}
