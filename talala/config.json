@@ -1,7 +1,6 @@
 {
   "name": "嗒啦啦",
   "name_en": "Dalalala",
-  "description": "A beautiful girl IP character with distinct style variations: flat color, thick paint, and 3D.",
   "require_style_selection": true,
   "style_options": {
     "平涂": {
