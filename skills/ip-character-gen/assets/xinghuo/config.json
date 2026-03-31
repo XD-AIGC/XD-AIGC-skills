@@ -1,0 +1,13 @@
+{
+  "name": "星星火",
+  "key": "xingxinghuo",
+  "aliases": ["星星火", "星火", "xingxinghuo"],
+  "anchor": "一团简洁形状的灵动火焰",
+  "description": "",
+  "referenceImage": {
+    "flat": "星星火-平涂.png",
+    "impasto": "星星火-厚涂.png",
+    "3d": "星星火-平涂.png"
+  },
+  "refConstraint": "保持图1的形象、画面风格、颜色细节、比例大小完全一致，生成图1的IP形象。灵巧的形状变化。"
+}

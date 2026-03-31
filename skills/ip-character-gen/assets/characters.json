@@ -6,7 +6,15 @@
     },
     "嗒啦啦": {
       "dir": "talala",
-      "aliases": ["talala", "嗒拉拉", "塔啦啦", "dalalala"]
+      "aliases": ["talala", "嗒拉拉", "塔啦啦", "塔啦拉", "嗒啦拉", "塔拉拉", "嗒拉拉", "dalalala", "tarara"]
+    },
+    "噗噜噜": {
+      "dir": "pululu",
+      "aliases": ["pululu", "噗鲁鲁", "噗噜鲁"]
+    },
+    "星星火": {
+      "dir": "xinghuo",
+      "aliases": ["xinghuo", "星火"]
     }
   }
 }

@@ -1,0 +1,13 @@
+{
+  "name": "噗噜噜",
+  "key": "pululu",
+  "aliases": ["噗噜噜", "噗鲁鲁", "噗噜鲁", "pululu"],
+  "anchor": "一个机器人IP形象",
+  "description": "黄色圆形腮红，白色符号眼睛（n n型）",
+  "referenceImage": {
+    "flat": "噗噜噜-平涂.png",
+    "impasto": "噗噜噜-厚涂.png",
+    "3d": "噗噜噜-平涂.png"
+  },
+  "refConstraint": "保持图1的画面风格、颜色细节、角色比例、完全一致，生成图1的IP形象。"
+}

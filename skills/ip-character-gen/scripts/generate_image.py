@@ -30,88 +30,107 @@ def has_chinese(text: str) -> bool:
     return any('\u4e00' <= ch <= '\u9fff' for ch in text)
 
 
-def translate_scene_to_english(scene: str, api_key: str) -> str:
-    """Translate Chinese scene description to English using Gemini."""
-    from google import genai
-
-    client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=f"Translate the following Chinese scene description to natural English. Only output the translation, nothing else:\n\n{scene}",
-    )
-    return response.text.strip()
+def load_styles(assets_dir: Path) -> dict:
+    """Load global styles from styles.json."""
+    styles_path = assets_dir / "styles.json"
+    if styles_path.exists():
+        with open(styles_path) as f:
+            return json.load(f)
+    return {}
 
 
-def build_prompt(config: dict, scene: str, style: str | None = None, aspect_ratio: str = "1:1") -> str:
-    """Build the generation prompt from character config and scene description."""
-    name = config["name"]
-    name_en = config.get("name_en", name)
+def resolve_style_key(style_input: str, styles: dict) -> str:
+    """Resolve a style input (Chinese or English) to the styles.json key.
 
-    if style and style.lower() == "3d":
-        style_direction = "3D rendered style"
-    elif style and style.lower() == "2d":
-        style_direction = config.get("default_style", "2D cartoon illustration")
-    elif style:
-        style_direction = style
+    Accepts: "平涂", "flat", "厚涂", "impasto", "3D", "3d", "2D", "2d"
+    Returns: the key in styles.json (e.g. "flat", "impasto", "3d", "2d")
+    """
+    lower = style_input.lower()
+    if lower in styles:
+        return lower
+    # Try matching by Chinese name
+    for key, info in styles.items():
+        if info.get("name") == style_input:
+            return key
+    return lower
+
+
+def build_structured_prompt(characters: list[dict], style_key: str, scene: str, styles: dict) -> str:
+    """
+    Build a structured prompt with three separated layers:
+    1. Character layer — anchor + description + refConstraint (per character)
+    2. Style layer — keywords + suffix from styles.json (applied once)
+    3. Scene layer — user's scene description
+    """
+    lines = []
+
+    # === Character layer ===
+    if len(characters) == 1:
+        char = characters[0]
+        char_identity = char["anchor"]
+        if char.get("description"):
+            char_identity += f"，{char['description']}"
+        lines.append(char_identity + "，")
+        lines.append(char.get("refConstraint", ""))
     else:
-        style_direction = config.get("default_style", "2D cartoon illustration")
+        names = "与".join(c["name"] for c in characters)
+        lines.append(f"绝美的{names}IP形象设计，")
+        for char in characters:
+            desc_part = ""
+            if char.get("description"):
+                desc_part = f"（{char['description']}）"
+            lines.append(f"图{char['index']}是{char['name']}的角色参考{desc_part}，{char.get('refConstraint', '')}")
+        lines.append(f"保持每个角色各自的形象、精致细节、人物比例完全一致，{names}一起进行互动，")
 
-    key_features = config.get("key_features", "")
-    key_features_block = f"\n{key_features}\n" if key_features else ""
+    # === Style layer ===
+    style_info = styles.get(style_key, {})
+    keywords = style_info.get("keywords", style_key)
+    suffix = style_info.get("suffix", "")
+    lines.append(keywords)
+    if suffix:
+        lines.append(suffix)
 
-    prompt = f"""The reference images above show a character called {name_en} ({name}). Study these reference images carefully — every detail of the character's design matters: the exact shape, colors, outfit, accessories, proportions, and facial features.
+    # === Scene layer ===
+    lines.append(scene)
 
-Now generate a NEW illustration of this EXACT SAME character in the following scene:
-
-Scene: {scene}
-
-Style: {style_direction}
-{key_features_block}
-Rules:
-- The character MUST look identical to the one in the reference images. Do not redesign or reinterpret the character.
-- Do NOT include any of the reference images in the output. Generate a completely new scene.
-- Keep the character's exact design: same outfit, same accessories, same color scheme, same proportions."""
-
-    return prompt
+    return "\n".join(lines)
 
 
-def select_reference_images(config: dict, char_dir: Path, style: str | None = None, max_refs: int = 5) -> list[tuple[Path, str]]:
-    """Select the best reference images for the given style. Returns list of (path, label)."""
-    style_refs = config.get("style_reference_images", {})
+def select_reference_images(config: dict, char_dir: Path, style_key: str | None = None, max_refs: int = 5) -> list[tuple[Path, str]]:
+    """Select reference images based on TapIP's referenceImage format.
 
-    if style and style.lower() in style_refs:
-        filenames = style_refs[style.lower()]
-    elif "reference_images" in config:
-        filenames = config["reference_images"]
+    referenceImage can be:
+    - string: single image for all styles
+    - object: {style_key: filename_or_list} per style
+    - null/missing: no reference images
+    """
+    ref_img = config.get("referenceImage")
+    if not ref_img:
+        return []
+
+    if isinstance(ref_img, str):
+        filenames = [ref_img]
+    elif isinstance(ref_img, dict):
+        value = ref_img.get(style_key) if style_key else None
+        if value is None:
+            # Fallback: use first available style's image
+            value = next(iter(ref_img.values()), None)
+        if value is None:
+            return []
+        filenames = value if isinstance(value, list) else [value]
     else:
-        filenames = [f.name for f in sorted(char_dir.glob("*.png")) + sorted(char_dir.glob("*.jpg"))]
-
-    # Build role labels from reference_roles config
-    role_map = {}
-    role_labels = {
-        "art_style": "Art style reference",
-        "proportions": "Character proportions reference",
-        "back_view": "Back view / rear design reference",
-        "front_view": "Front view reference",
-        "expression": "Expression reference",
-        "detail": "Detail reference",
-    }
-    for role, fns in config.get("reference_roles", {}).items():
-        for fn in fns:
-            role_map.setdefault(fn, []).append(role_labels.get(role, role))
+        return []
 
     results = []
     for fn in filenames[:max_refs]:
         p = char_dir / fn
         if p.exists():
-            labels = role_map.get(fn, [])
-            label = " + ".join(labels) if labels else "Character reference"
-            results.append((p, label))
+            results.append((p, "Character reference"))
     return results
 
 
 def generate_image(
-    character_name: str,
+    character_names: list[str],
     scene: str,
     project_root: Path,
     output_dir: Path,
@@ -152,64 +171,69 @@ def generate_image(
     with open(registry_path) as f:
         registry = json.load(f)
 
-    # Find character
-    char_entry = None
-    char_key = None
-    for name, entry in registry["characters"].items():
-        if name == character_name or character_name.lower() in [a.lower() for a in entry.get("aliases", [])]:
-            char_entry = entry
-            char_key = name
-            break
+    # Load styles
+    styles = load_styles(project_root)
 
-    if not char_entry:
-        available = ", ".join(registry["characters"].keys())
-        print(f"Error: Character '{character_name}' not found. Available: {available}", file=sys.stderr)
-        sys.exit(1)
+    # Find all characters
+    characters_data = []
+    for idx, character_name in enumerate(character_names, start=1):
+        char_entry = None
+        for name, entry in registry["characters"].items():
+            if name == character_name or character_name.lower() in [a.lower() for a in entry.get("aliases", [])]:
+                char_entry = entry
+                break
 
-    # Load character config
-    char_dir = project_root / char_entry["dir"]
-    config_path = char_dir / "config.json"
-    if not config_path.exists():
-        print(f"Error: Character config not found at {config_path}", file=sys.stderr)
-        sys.exit(1)
+        if not char_entry:
+            available = ", ".join(registry["characters"].keys())
+            print(f"Error: Character '{character_name}' not found. Available: {available}", file=sys.stderr)
+            sys.exit(1)
 
-    with open(config_path) as f:
-        config = json.load(f)
+        char_dir = project_root / char_entry["dir"]
+        config_path = char_dir / "config.json"
+        if not config_path.exists():
+            print(f"Error: Character config not found at {config_path}", file=sys.stderr)
+            sys.exit(1)
 
-    # Check for style-specific prompt override in config (e.g., Feishu-sourced prompts)
-    style_options = config.get("style_options", {})
-    style_prompt_override = None
-    if style and style in style_options:
-        style_prompt_override = style_options[style].get("style_prompt")
+        with open(config_path) as f:
+            config = json.load(f)
 
-    if style_prompt_override:
-        # Use the full prompt from config directly, append key_features and scene
-        key_features = config.get("key_features", "")
-        key_features_block = f"\n\n{key_features}" if key_features else ""
-        prompt_text = f"{style_prompt_override}{key_features_block}\n\n场景：{scene}"
-        print(f"Using style prompt override for '{style}'", file=sys.stderr)
-    else:
-        # Translate Chinese scene to English for better generation quality
-        if has_chinese(scene):
-            print(f"Translating scene from Chinese: {scene}", file=sys.stderr)
-            scene = translate_scene_to_english(scene, api_key)
-            print(f"Translated to English: {scene}", file=sys.stderr)
-        prompt_text = build_prompt(config, scene, style, aspect_ratio)
+        characters_data.append({
+            "name": config["name"],
+            "key": config.get("key", ""),
+            "index": idx,
+            "anchor": config.get("anchor", config["name"]),
+            "description": config.get("description", ""),
+            "refConstraint": config.get("refConstraint", ""),
+            "config": config,
+            "char_dir": char_dir,
+        })
+
+    # Resolve style key (Chinese "平涂" or English "flat" → styles.json key)
+    resolved_style = resolve_style_key(style, styles) if style else next(iter(styles), "flat")
+
+    # Build structured prompt
+    prompt_text = build_structured_prompt(
+        [{"name": c["name"], "index": c["index"],
+          "anchor": c["anchor"], "description": c["description"], "refConstraint": c["refConstraint"]}
+         for c in characters_data],
+        resolved_style,
+        scene,
+        styles,
+    )
     print(f"Prompt:\n{prompt_text}\n", file=sys.stderr)
 
-    # Select and load reference images
-    ref_images = select_reference_images(config, char_dir, style, max_refs)
-    print(f"Using {len(ref_images)} reference images: {[(p.name, label) for p, label in ref_images]}", file=sys.stderr)
+    # Select reference images for each character
+    all_ref_images = []
+    for char in characters_data:
+        refs = select_reference_images(char["config"], char["char_dir"], resolved_style, max_refs)
+        all_ref_images.extend(refs)
+        print(f"{char['name']} reference images: {[(p.name, label) for p, label in refs]}", file=sys.stderr)
 
-    # Build API request contents
+    # Build API request contents: images first, then prompt
     contents = []
-
-    # Add reference images (no labels — cleaner input yields better visual fidelity)
-    for ref_path, label in ref_images:
+    for ref_path, label in all_ref_images:
         img_data, mime_type = load_image_as_base64(ref_path)
         contents.append(types.Part.from_bytes(data=base64.standard_b64decode(img_data), mime_type=mime_type))
-
-    # Add text prompt
     contents.append(types.Part.from_text(text=prompt_text))
 
     # Call Gemini API
@@ -227,8 +251,9 @@ def generate_image(
     # Extract and save generated image
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
+    char_names = "_".join(c["name"] for c in characters_data)
     safe_scene = scene[:30].replace(" ", "_").replace("/", "_")
-    output_filename = f"{char_key}_{safe_scene}_{timestamp}.png"
+    output_filename = f"{char_names}_{safe_scene}_{timestamp}.png"
     output_path = output_dir / output_filename
 
     image_saved = False
@@ -252,28 +277,37 @@ def generate_image(
         print(f"Full response: {response}", file=sys.stderr)
         sys.exit(1)
 
-    # Output the path for the caller to use
     print(str(output_path))
     return output_path
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate IP character images using Gemini")
-    parser.add_argument("--character", required=True, help="Character name (e.g., 麦芬)")
+    parser.add_argument("--character", help="Single character name (e.g., 麦芬)")
+    parser.add_argument("--characters", help="Multiple character names, comma-separated (e.g., 麦芬,嗒啦啦)")
     parser.add_argument("--scene", required=True, help="Scene description (e.g., 在海边散步)")
     parser.add_argument("--project-root", required=True, help="Project root directory containing characters.json")
     parser.add_argument("--output", default=None, help="Output directory (default: project-root/output/)")
-    parser.add_argument("--style", default=None, help="Art style: 2d, 3d, or custom description")
+    parser.add_argument("--style", default=None, help="Art style: flat/平涂, impasto/厚涂, 3d/3D, 2d/2D")
     parser.add_argument("--model", default="gemini-3-pro-image-preview", help="Gemini model name")
-    parser.add_argument("--max-refs", type=int, default=5, help="Maximum number of reference images to send")
-    parser.add_argument("--aspect-ratio", default="1:1", help="Image aspect ratio (e.g., 1:1, 4:3, 16:9, 3:4, 9:16)")
+    parser.add_argument("--max-refs", type=int, default=5, help="Maximum reference images per character")
+    parser.add_argument("--aspect-ratio", default="1:1", help="Image aspect ratio")
     args = parser.parse_args()
+
+    if not args.character and not args.characters:
+        print("Error: Provide --character or --characters", file=sys.stderr)
+        sys.exit(1)
+
+    if args.characters:
+        character_names = [c.strip() for c in args.characters.split(",")]
+    else:
+        character_names = [args.character]
 
     project_root = Path(args.project_root).resolve()
     output_dir = Path(args.output).resolve() if args.output else project_root / "output"
 
     generate_image(
-        character_name=args.character,
+        character_names=character_names,
         scene=args.scene,
         project_root=project_root,
         output_dir=output_dir,

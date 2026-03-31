@@ -1,19 +1,11 @@
 {
   "name": "麦芬",
-  "name_en": "Muffin",
-  "style_options": {
-    "2D": {
-      "label": "2D卡通插画",
-      "style_key": "2D",
-      "style_prompt": "图1角色，尾巴形状严格参照图1，"
-    }
+  "key": "muffin",
+  "aliases": ["麦芬", "muffin", "gogo muffin", "GOGO麦芬", "麦芬猫"],
+  "anchor": "一个可爱的麦芬猫咪IP形象",
+  "description": "尾巴形状严格参照参考图",
+  "referenceImage": {
+    "2d": ["麦芬15.png", "麦芬02.png", "麦芬08.png"]
   },
-  "style_reference_images": {
-    "2D": ["麦芬15.png", "麦芬02.png", "麦芬08.png"]
-  },
-  "reference_images": ["麦芬15.png", "麦芬02.png", "麦芬08.png"],
-  "reference_roles": {
-    "expression": ["麦芬02.png"],
-    "proportions": ["麦芬08.png"]
-  }
+  "refConstraint": "保持图1的画面风格、颜色细节、角色比例完全一致，生成图1的IP形象。"
 }
